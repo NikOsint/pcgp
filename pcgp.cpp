@@ -66,14 +66,14 @@ typedef struct {
     int v;
 } VertPair;
 
-void adjVert(VertPair *restrict p, Graph *restrict g, int u, int i) {
+void adjVert(VertPair *__restrict p, Graph *__restrict g, int u, int i) {
     p->u = (u + g->s[i]) % g->n;
     p->v = (u - g->s[i] + g->n) % g->n;
 }
 
-void circulantBFS(Arena *restrict arena, GraphProp *restrict prop, Graph *restrict g) {
-    int *restrict dist = arenaAlloc(arena, g->n * sizeof(*dist));
-    int *restrict queue = arenaAlloc(arena, g->n * sizeof(*queue));
+void circulantBFS(Arena *__restrict arena, GraphProp *__restrict prop, Graph *__restrict g) {
+    int *__restrict dist = static_cast<int*>(arenaAlloc(arena, g->n * sizeof(*dist)));
+    int *__restrict queue = static_cast<int*>(arenaAlloc(arena, g->n * sizeof(*queue)));
     dist[0] = 0;
     for (int i = 1; i < g->n; i++) {
         dist[i] = INT_MAX;
@@ -139,15 +139,15 @@ int KernighanLinPartitionCost(Graph *graph, const int *part) {
     return cost;
 }
 
-int circulantKernighanLin(Arena *restrict arena, Graph *restrict graph) {
+int circulantKernighanLin(Arena *__restrict arena, Graph *__restrict graph) {
     int passes = 0;
-    int *restrict V = arenaAlloc(arena, graph->n * sizeof(*V));
-    int *restrict P = arenaAlloc(arena, graph->n * sizeof(*P));
-    int *restrict D = arenaAlloc(arena, graph->n * sizeof(*D));
-    int *restrict G_sum = arenaAlloc(arena, graph->n * sizeof(*G_sum));
+    int *__restrict V = static_cast<int*>(arenaAlloc(arena, graph->n * sizeof(*V)));
+    int *__restrict P = static_cast<int*>(arenaAlloc(arena, graph->n * sizeof(*P)));
+    int *__restrict D = static_cast<int*>(arenaAlloc(arena, graph->n * sizeof(*D)));
+    int *__restrict G_sum = static_cast<int*>(arenaAlloc(arena, graph->n * sizeof(*G_sum)));
     int G_sum_max = 0;
     int GAB_size = 0;
-    KLPair *restrict GAB = arenaAlloc(arena, graph->n * sizeof(*GAB));
+    KLPair *__restrict GAB = static_cast<KLPair*>(arenaAlloc(arena, graph->n * sizeof(*GAB)));
     for (int i = 0; i < graph->n / 2; i++) {
         P[i] = 0;
     }
@@ -289,7 +289,7 @@ int main(int argc, char **argv) {
             die("Invalid arguments");
         if (graphCheck(&g))
             die("Invalid argument values");
-        g.s = malloc(g.k * sizeof(*g.s));
+        g.s = static_cast<int*>(malloc(g.k * sizeof(*g.s)));
         if (!g.s)
             goto error;
         const size_t GS_SIZE = (g.k - g.so) * sizeof(*g.s);
@@ -330,7 +330,7 @@ int main(int argc, char **argv) {
                     }
                     void *buf = g.s + g.so;
                     size_t len = g.k - g.so;
-                    if (fread(g.s + g.so, sizeof(*g.s), len, state_file) == len) {
+                    if (fread(buf, sizeof(*g.s), len, state_file) == len) {
                         restored = true;
                     }
                 }
@@ -509,7 +509,7 @@ int main(int argc, char **argv) {
                     void *buf = g.s + g.so;
                     size_t len = g.k - g.so;
                     size_t ele_read = 0;
-                    while (ele_read = fread(buf, sizeof(*g.s), len, bfs_file)) {
+                    while ((ele_read = fread(buf, sizeof(*g.s), len, bfs_file))) {
                         if (ele_read == len) {
                             for (int i = 0; i < g.k - 1; i++) {
                                 fprintf(output_file, "%d ", g.s[i]);
@@ -541,7 +541,7 @@ int main(int argc, char **argv) {
                 size_t len = g.k - g.so;
                 size_t ele_read = 0;
                 clock_start = clock_prev = clock();
-                while (ele_read = fread(buf, sizeof(*g.s), len, bfs_file)) {
+                while ((ele_read = fread(buf, sizeof(*g.s), len, bfs_file))) {
                     if (ele_read == len) {
                         int bisect_cost = circulantKernighanLin(&arena, &g);
                         if (bisect_cost >= scan.best_bisect_cost) {
@@ -613,7 +613,7 @@ int main(int argc, char **argv) {
                     void *buf = g.s + g.so;
                     size_t len = g.k - g.so;
                     size_t ele_read = 0;
-                    while (ele_read = fread(buf, sizeof(*g.s), len, kl_file)) {
+                    while ((ele_read = fread(buf, sizeof(*g.s), len, kl_file))) {
                         if (ele_read == len) {
                             for (int i = 0; i < g.k - 1; i++) {
                                 fprintf(output_file, "%d ", g.s[i]);
@@ -639,7 +639,6 @@ int main(int argc, char **argv) {
             arenaInit(&arena, arena_mem, arena_size);
         }
         int graph_buf[BUFSIZ] = { 0 };
-        int gk = 0;
         char line_buf[LINE_MAX] = { 0 };
         while (fgets(line_buf, LINE_MAX, stdin)) {
             if (ferror(stdin))

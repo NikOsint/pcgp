@@ -11,8 +11,8 @@ run: pcgp.exe
 		fi \
 	fi
 
-pcgp.exe: pcgpmem.h pcgpmem.c pcgp.c
-	gcc pcgpmem.c pcgp.c -o pcgp.exe
+pcgp.exe: pcgpmem.h pcgpmem.cpp pcgp.cpp
+	g++ -Wall -std=c++11 pcgpmem.cpp pcgp.cpp -o pcgp.exe
 
 .PHONY: clean
 clean:
