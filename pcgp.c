@@ -382,7 +382,7 @@ int main(int argc, char **argv) {
             }
             fprintf(stderr, "N=%d K=%d C=%d (%llu graphs)\n", g.n, g.k, g.so, scan.graph_count_max);
             if (restored) {
-                fprintf(stderr, "Restored scan state at stage %d graph %zu\n", scan.stage, scan.graph_count);
+                fprintf(stderr, "Restored scan state at stage %d graph %llu\n", scan.stage, scan.graph_count);
             }
         }
         FILE *log_file = NULL;

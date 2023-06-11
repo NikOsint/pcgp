@@ -6,7 +6,7 @@ run: pcgp.exe
 		else \
 			if [ -z "$(C)" ]; then echo "Parameter C not difined"; \
 			else \
-				mkdir pcgp-$(N)-$(K)-$(C) && cd pcgp-$(N)-$(K)-$(C) && ../pcgp.exe $(N) $(K) $(C); \
+				rm -rf pcgp-$(N)-$(K)-$(C) && mkdir pcgp-$(N)-$(K)-$(C) && cd pcgp-$(N)-$(K)-$(C) && ../pcgp.exe s $(N) $(K) $(C); \
 			fi \
 		fi \
 	fi
