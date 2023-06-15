@@ -24,5 +24,5 @@ make N=<n> K=<k> C=<c>
 
 Change `<n>`, `<k>`, `<c>` to the desired parameter values.
 
-This command will build the executable if it is not built yet.
+This command will build the executable if it is not built yet and run it with the defined parameters.
 
