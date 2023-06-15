@@ -1,6 +1,8 @@
 # PCGP
 
-PCGP is a C/C++ program for counting the bisection of circulant graphs.
+PCGP is a multithreaded C/C++ program for counting the bisection of circulant graphs.
+
+Multithreading is implemented using C++11 threads.
 
 # Usage
 
