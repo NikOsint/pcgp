@@ -12,7 +12,7 @@ run: pcgp.exe
 	fi
 
 pcgp.exe: pcgpmem.h pcgpmem.cpp pcgp.cpp
-	g++ -Wall -std=c++11 pcgpmem.cpp pcgp.cpp -o pcgp.exe
+	g++ -Wall -std=c++11 pcgpmem.cpp pcgp.cpp -o pcgp.exe #-fopenmp
 
 .PHONY: clean
 clean:

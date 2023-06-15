@@ -20,6 +20,8 @@
 #include <float.h>
 #include <ctype.h>
 
+//#include <omp.h>
+
 #include "pcgpmem.h"
 
 #define LINE_MAX 4096
@@ -154,6 +156,7 @@ int circulantKernighanLin(Arena *__restrict arena, Graph *__restrict graph) {
     for (int i = graph->n / 2; i < graph->n; i++) {
         P[i] = 1;
     }
+    //#pragma omp parallel default(none) private (GAB_size, G_sum_max) shared(graph, V, P, D, G_sum, GAB, passes)
     do {
         GAB_size = 0;
         for (int u = 0; u < graph->n; u++) {
@@ -168,38 +171,43 @@ int circulantKernighanLin(Arena *__restrict arena, Graph *__restrict graph) {
                 }
             }
         }
-        for (int i = 0; i < graph->n / 2; i++) {
-            int g_max = INT_MIN;
-            int a_max = 0, b_max = 0;
-            for (int a = 0; a < graph->n; a++) {
-                if (!V[a] && (P[a] == 0)) {
-                    for (int b = 0; b < graph->n; b++) {
-                        if (!V[b] && (P[b] == 1)) {
-                            int g = D[a] + D[b] - 2 * KernighanLinC(graph, P, a, b);
-                            if (g > g_max) {
-                                g_max = g;
-                                a_max = a;
-                                b_max = b;
+        // private(i, a, b, g, a_max, b_max, g_max, gab, u, c_ab, c_yb, c_xa, c_xb)
+        //#pragma omp parallel default(none) shared(graph, V, P, D, GAB, GAB_size)
+        {
+            //#pragma omp for
+            for (int i = 0; i < graph->n / 2; i++) {
+                int g_max = INT_MIN;
+                int a_max = 0, b_max = 0;
+                for (int a = 0; a < graph->n; a++) {
+                    if (!V[a] && (P[a] == 0)) {
+                        for (int b = 0; b < graph->n; b++) {
+                            if (!V[b] && (P[b] == 1)) {
+                                int g = D[a] + D[b] - 2 * KernighanLinC(graph, P, a, b);
+                                if (g > g_max) {
+                                    g_max = g;
+                                    a_max = a;
+                                    b_max = b;
+                                }
                             }
                         }
                     }
                 }
-            }
-            V[a_max] = V[b_max] = 1;
-            KLPair *gab = &GAB[GAB_size++];
-            gab->a = a_max;
-            gab->b = b_max;
-            gab->g = g_max;
-            for (int u = 0; u < graph->n; u++) {
-                if (V[u]) continue;
-                else if (P[u]) {
-                    int c_yb = KernighanLinC(graph, P, u, b_max);
-                    int c_ab = KernighanLinC(graph, P, u, a_max);
-                    D[u] += 2 * c_yb - 2 * c_ab;
-                } else {
-                    int c_xa = KernighanLinC(graph, P, u, a_max);
-                    int c_xb = KernighanLinC(graph, P, u, b_max);
-                    D[u] += 2 * c_xa - 2 * c_xb;
+                V[a_max] = V[b_max] = 1;
+                KLPair *gab = &GAB[GAB_size++];
+                gab->a = a_max;
+                gab->b = b_max;
+                gab->g = g_max;
+                for (int u = 0; u < graph->n; u++) {
+                    if (V[u]) continue;
+                    else if (P[u]) {
+                        int c_yb = KernighanLinC(graph, P, u, b_max);
+                        int c_ab = KernighanLinC(graph, P, u, a_max);
+                        D[u] += 2 * c_yb - 2 * c_ab;
+                    } else {
+                        int c_xa = KernighanLinC(graph, P, u, a_max);
+                        int c_xb = KernighanLinC(graph, P, u, b_max);
+                        D[u] += 2 * c_xa - 2 * c_xb;
+                    }
                 }
             }
         }
