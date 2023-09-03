@@ -1,9 +1,8 @@
 #ifndef PCGPMEM_H
 #define PCGPMEM_H
 
-#include <stdbool.h>
-#include <stdint.h>
-#include <stddef.h>
+#include <cstdint>
+#include <cstddef>
 
 #define PCGPMEM_ALIGN (2 * sizeof(void *))
 

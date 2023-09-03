@@ -1,5 +1,5 @@
 .PHONY: run
-run: pcgp.exe
+run: all
 	@if [ -z "$(N)" ]; then echo "Parameter N not difined"; \
 	else \
 		if [ -z "$(K)" ]; then echo "Parameter K not difined"; \
@@ -11,7 +11,8 @@ run: pcgp.exe
 		fi \
 	fi
 
-pcgp.exe: pcgpmem.h pcgpmem.cpp pcgp.cpp
+.PHONY: all
+all: pcgpmem.h pcgpmem.cpp pcgp.cpp
 	g++ -Wall -std=c++11 pcgpmem.cpp pcgp.cpp -o pcgp.exe #-fopenmp
 
 .PHONY: clean

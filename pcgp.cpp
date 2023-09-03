@@ -8,17 +8,15 @@
 #define FSEEK fseek
 #endif
 
-#include <errno.h>
-#include <stdbool.h>
-#include <stdlib.h>
-#include <stdio.h>
-#include <stdint.h>
-#include <stddef.h>
-#include <string.h>
-#include <time.h>
-#include <limits.h>
-#include <float.h>
-#include <ctype.h>
+#include <cerrno>
+#include <cstdlib>
+#include <cstdio>
+#include <cstddef>
+#include <cstring>
+#include <ctime>
+#include <climits>
+#include <cfloat>
+#include <cctype>
 
 //#include <omp.h>
 
@@ -36,17 +34,17 @@ void die(const char *msg) {
 }
 
 bool str2int(int *out, char *str, int base) {
-    char *end = NULL;
+    char *end = nullptr;
     if (str[0] == '\0' || isspace(str[0]))
-        return 0;
+        return false;
     errno = 0;
     long l = strtol(str, &end, base);
     if (l > INT_MAX || l < INT_MIN
-        || errno == ERANGE && (l == LONG_MAX || l == LONG_MIN)
+        || (errno == ERANGE && (l == LONG_MAX || l == LONG_MIN))
         || *end != '\0') {
         return false;
     } else {
-        *out = l;
+        *out = static_cast<int>(l);
         return true;
     }
 }
@@ -77,7 +75,7 @@ void circulantBFS(Arena *__restrict arena, GraphProp *__restrict prop, Graph *__
     int *__restrict dist = static_cast<int*>(arenaAlloc(arena, g->n * sizeof(*dist)));
     int *__restrict queue = static_cast<int*>(arenaAlloc(arena, g->n * sizeof(*queue)));
     dist[0] = 0;
-    for (int i = 1; i < g->n; i++) {
+    for (int i = 1; i < g->n; ++i) {
         dist[i] = INT_MAX;
     }
     queue[0] = 0;
@@ -85,18 +83,18 @@ void circulantBFS(Arena *__restrict arena, GraphProp *__restrict prop, Graph *__
     int qw = 1;
     int vc = 1;
     while (vc < g->n && qr != qw) {
-        int u = queue[qr++];
+        int u = queue[++qr];
         int d = dist[u] + 1;
-        for (int i = 0; i < g->k; i++) {
+        for (int i = 0; i < g->k; ++i) {
             VertPair uv = { 0 };
             adjVert(&uv, g, u, i);
             if (dist[uv.u] == INT_MAX) {
-                queue[qw++] = uv.u;
+                queue[++qw] = uv.u;
                 dist[uv.u] = dist[(g->n - uv.u) % g->n] = d;
                 vc += 2;
             }
             if (dist[uv.v] == INT_MAX) {
-                queue[qw++] = uv.v;
+                queue[++qw] = uv.v;
                 dist[uv.v] = dist[(g->n - uv.v) % g->n] = d;
                 vc += 2;
             }
@@ -104,7 +102,7 @@ void circulantBFS(Arena *__restrict arena, GraphProp *__restrict prop, Graph *__
     }
     int diam = 0;
     int dist_sum = 0;
-    for (int i = 0; i < g->n; i++) {
+    for (int i = 0; i < g->n; ++i) {
         diam = diam > dist[i] ? diam : dist[i];
         dist_sum += dist[i];
     }
@@ -118,10 +116,10 @@ typedef struct {
 } KLPair;
 
 int KernighanLinC(Graph *graph, const int *part, unsigned a, unsigned b) {
-    for (int i = 0; i < graph->k; i++) {
+    for (int i = 0; i < graph->k; ++i) {
         VertPair uv = { 0 };
-        adjVert(&uv, graph, a, i);
-        if (uv.v == b || uv.u == b) {
+        adjVert(&uv, graph, static_cast<int>(a), i);
+        if (uv.v == static_cast<int>(b) || uv.u == static_cast<int>(b)) {
             return part[a] != part[b] ? 1 : -1;
         }
     }
@@ -130,11 +128,11 @@ int KernighanLinC(Graph *graph, const int *part, unsigned a, unsigned b) {
 
 int KernighanLinPartitionCost(Graph *graph, const int *part) {
     int cost = 0;
-    for (int u = 0; u < graph->n; u++) {
-        for (int i = 0; i < graph->k; i++) {
+    for (int u = 0; u < graph->n; ++u) {
+        for (int i = 0; i < graph->k; ++i) {
             const int v = (u + graph->s[i]) % graph->n;
             if (part[u] != part[v]) {
-                cost++;
+                ++cost;
             }
         }
     }
@@ -142,7 +140,6 @@ int KernighanLinPartitionCost(Graph *graph, const int *part) {
 }
 
 int circulantKernighanLin(Arena *__restrict arena, Graph *__restrict graph) {
-    int passes = 0;
     int *__restrict V = static_cast<int*>(arenaAlloc(arena, graph->n * sizeof(*V)));
     int *__restrict P = static_cast<int*>(arenaAlloc(arena, graph->n * sizeof(*P)));
     int *__restrict D = static_cast<int*>(arenaAlloc(arena, graph->n * sizeof(*D)));
@@ -150,19 +147,19 @@ int circulantKernighanLin(Arena *__restrict arena, Graph *__restrict graph) {
     int G_sum_max = 0;
     int GAB_size = 0;
     KLPair *__restrict GAB = static_cast<KLPair*>(arenaAlloc(arena, graph->n * sizeof(*GAB)));
-    for (int i = 0; i < graph->n / 2; i++) {
+    for (int i = 0; i < graph->n / 2; ++i) {
         P[i] = 0;
     }
-    for (int i = graph->n / 2; i < graph->n; i++) {
+    for (int i = graph->n / 2; i < graph->n; ++i) {
         P[i] = 1;
     }
     //#pragma omp parallel default(none) private (GAB_size, G_sum_max) shared(graph, V, P, D, G_sum, GAB, passes)
     do {
         GAB_size = 0;
-        for (int u = 0; u < graph->n; u++) {
+        for (int u = 0; u < graph->n; ++u) {
             V[u] = 0;
             D[u] = 0;
-            for (int i = 0; i < graph->k; i++) {
+            for (int i = 0; i < graph->k; ++i) {
                 VertPair uv = { 0 };
                 adjVert(&uv, graph, u, i);
                 D[u] += (P[u] != P[uv.u] ? 1 : -1);
@@ -175,12 +172,12 @@ int circulantKernighanLin(Arena *__restrict arena, Graph *__restrict graph) {
         //#pragma omp parallel default(none) shared(graph, V, P, D, GAB, GAB_size)
         {
             //#pragma omp for
-            for (int i = 0; i < graph->n / 2; i++) {
+            for (int i = 0; i < graph->n / 2; ++i) {
                 int g_max = INT_MIN;
                 int a_max = 0, b_max = 0;
-                for (int a = 0; a < graph->n; a++) {
+                for (int a = 0; a < graph->n; ++a) {
                     if (!V[a] && (P[a] == 0)) {
-                        for (int b = 0; b < graph->n; b++) {
+                        for (int b = 0; b < graph->n; ++b) {
                             if (!V[b] && (P[b] == 1)) {
                                 int g = D[a] + D[b] - 2 * KernighanLinC(graph, P, a, b);
                                 if (g > g_max) {
@@ -193,11 +190,11 @@ int circulantKernighanLin(Arena *__restrict arena, Graph *__restrict graph) {
                     }
                 }
                 V[a_max] = V[b_max] = 1;
-                KLPair *gab = &GAB[GAB_size++];
+                KLPair *gab = &GAB[++GAB_size];
                 gab->a = a_max;
                 gab->b = b_max;
                 gab->g = g_max;
-                for (int u = 0; u < graph->n; u++) {
+                for (int u = 0; u < graph->n; ++u) {
                     if (V[u]) continue;
                     else if (P[u]) {
                         int c_yb = KernighanLinC(graph, P, u, b_max);
@@ -213,7 +210,7 @@ int circulantKernighanLin(Arena *__restrict arena, Graph *__restrict graph) {
         }
         int k = 0;
         G_sum_max = G_sum[0] = GAB[0].g;
-        for (int i = 1; i < GAB_size; i++) {
+        for (int i = 1; i < GAB_size; ++i) {
             G_sum[i] = G_sum[i - 1] + GAB[i].g;
             if (G_sum[i] > G_sum_max) {
                 G_sum_max = G_sum[i];
@@ -221,14 +218,13 @@ int circulantKernighanLin(Arena *__restrict arena, Graph *__restrict graph) {
             }
         }
         if (G_sum_max > 0) {
-            for (int i = 0; i <= k; i++) {
+            for (int i = 0; i <= k; ++i) {
                 KLPair *uv = &GAB[i];
                 int tmp = P[uv->a];
                 P[uv->a] = P[uv->b];
                 P[uv->b] = tmp;
             }
         }
-        passes++;
     } while (G_sum_max > 0);
     return KernighanLinPartitionCost(graph, P);
 }
@@ -288,11 +284,11 @@ int main(int argc, char **argv) {
             mode = PCGP_MODE_IMMEDIATE;
         }
     }
-    argc--;
-    argv++;
+    --argc;
+    ++argv;
     switch (mode) {
     case PCGP_MODE_SCAN: {
-        Graph g = { 0 };
+        Graph g;
         if (argc != 4 || !(str2int(&g.n, argv[1], 10) && str2int(&g.k, argv[2], 10) && str2int(&g.so, argv[3], 10)))
             die("Invalid arguments");
         if (graphCheck(&g))
@@ -301,15 +297,15 @@ int main(int argc, char **argv) {
         if (!g.s)
             goto error;
         const size_t GS_SIZE = (g.k - g.so) * sizeof(*g.s);
-        ScanState scan = { 0 };
+        ScanState scan;
         scan.stage = PCGP_STAGE_BFS;
         scan.best_diam = INT_MAX;
         scan.best_aspl = DBL_MAX;
         scan.best_bisect_cost = 0;
         unsigned long long graph_count_prev = 0;
-        FILE *state_file = NULL;
-        FILE *bfs_file = NULL;
-        FILE *kl_file = NULL;
+        FILE *state_file = nullptr;
+        FILE *bfs_file = nullptr;
+        FILE *kl_file = nullptr;
         {/* restore scan state from file or initialize */
             bool restored = false;
             char bfs_file_name[0x100] = { 0 };
@@ -333,7 +329,7 @@ int main(int argc, char **argv) {
             state_file = fopen(state_file_name, "rb+");
             if (state_file) {
                 if (fread(&scan, sizeof(scan), 1, state_file) == 1) {
-                    for (int i = 0; i < g.so; i++) {
+                    for (int i = 0; i < g.so; ++i) {
                         g.s[i] = i + 1;
                     }
                     void *buf = g.s + g.so;
@@ -347,12 +343,12 @@ int main(int argc, char **argv) {
                 bfs_file = fopen(bfs_file_name, "rb+");
                 if (!bfs_file)
                     goto error;
-                if (FSEEK(bfs_file, scan.bfs_log_count * GS_SIZE, SEEK_SET))
+                if (FSEEK(bfs_file, static_cast<long>(scan.bfs_log_count * GS_SIZE), SEEK_SET))
                     goto error;
                 kl_file = fopen(kl_file_name, "rb+");
                 if (!kl_file)
                     goto error;
-                if (FSEEK(kl_file, scan.kl_log_count * GS_SIZE, SEEK_SET))
+                if (FSEEK(kl_file, static_cast<long>(scan.kl_log_count * GS_SIZE), SEEK_SET))
                     goto error;
                 graph_count_prev = scan.graph_count;
             } else {/* initialize scan state */
@@ -375,14 +371,14 @@ int main(int argc, char **argv) {
                         scan.graph_count_max = 1;
                     } else {
                         long long c = n;
-                        for (long long i = 2; i <= k; i++) {
+                        for (long long i = 2; i <= k; ++i) {
                             c *= (n - i + 1);
                             c /= i;
                         }
                         scan.graph_count_max = c;
                     }
                 }
-                for (int i = 0; i < g.k; i++) {
+                for (int i = 0; i < g.k; ++i) {
                     g.s[i] = i + 1;
                 }
                 if (stateFileWrite(&scan, &g, state_file))
@@ -393,7 +389,7 @@ int main(int argc, char **argv) {
                 fprintf(stderr, "Restored scan state at stage %d graph %llu\n", scan.stage, scan.graph_count);
             }
         }
-        FILE *log_file = NULL;
+        FILE *log_file = nullptr;
         {
             char file_name[0x100] = { 0 };
             int len = snprintf(file_name, sizeof(file_name), "%d-%d-%d.log.csv", g.n, g.k, g.so);
@@ -405,7 +401,7 @@ int main(int argc, char **argv) {
             if (fputs("graph_count,elapsed,eta,best_diam,best_aspl\n", log_file) == EOF)
                 goto error;
         }
-        Arena arena = { 0 };
+        Arena arena = { nullptr, nullptr, nullptr };
         {
             size_t arena_size = 64 * g.n * sizeof(*g.s);
             void *arena_mem = malloc(arena_size);
@@ -418,7 +414,7 @@ int main(int argc, char **argv) {
         switch (scan.stage) {
         case PCGP_STAGE_BFS: {
             clock_start = clock_prev = clock();
-            bool running = 1;
+            bool running = true;
             while (running) {
                 {/* compute and write values for S */
                     GraphProp prop = { 0 };
@@ -429,9 +425,9 @@ int main(int argc, char **argv) {
                             scan.best_diam = prop.diam;
                             scan.graph_count_best = 1;
                         } else {
-                            scan.graph_count_best++;
+                            ++scan.graph_count_best;
                         }
-                        scan.bfs_log_count++;
+                        ++scan.bfs_log_count;
                         {/* write only the variable part of S */
                             void *buf = g.s + g.so;
                             size_t len = g.k - g.so;
@@ -457,18 +453,18 @@ int main(int argc, char **argv) {
                     }
                     running = changed;
                 }
-                scan.graph_count++;
+                ++scan.graph_count;
                 clock_t clock_now = clock();
-                double elapsed = (clock_now - clock_prev) / CLOCKS_PER_SEC;
+                double elapsed = static_cast<double>(clock_now - clock_prev) / CLOCKS_PER_SEC;
                 if (!running || elapsed >= STATE_UPDATE_TIME) {
                     {/* print logs */
                         clock_prev = clock_now;
                         unsigned long long graph_count_rel = scan.graph_count - graph_count_prev;
                         graph_count_prev     = scan.graph_count;
                         double elapsed_total = (double)(clock_now - clock_start) / CLOCKS_PER_SEC;
-                        double gps           = elapsed != 0 ? (double)graph_count_rel / elapsed : graph_count_rel;
+                        double gps           = elapsed != 0 ? (double)graph_count_rel / elapsed : (double)graph_count_rel;
                         double eta           = (double)(scan.graph_count_max - scan.graph_count) / gps;
-                        double scan_prc      = (double)scan.graph_count / scan.graph_count_max * 100.0;
+                        double scan_prc      = (double)scan.graph_count / (double)scan.graph_count_max * 100.0;
                         int rc = 0;
                         rc = fprintf(stderr, "[Stage 0] %.2f%% (%lld/%lld) ETA=%.fs Elapsed=%gs GPS=%g Diam=%d ASPL=%g\n",
                                      scan_prc, scan.graph_count, scan.graph_count_max,
@@ -496,7 +492,7 @@ int main(int argc, char **argv) {
                 arenaFree(&arena);
             }
             {/* write BFS pass results */
-                FILE *output_file = NULL;
+                FILE *output_file = nullptr;
                 {
                     char file_name[0x100] = { 0 };
                     int len = snprintf(file_name, sizeof(file_name), "%d-%d-%d.output-stage0.txt", g.n, g.k, g.so);
@@ -511,7 +507,7 @@ int main(int argc, char **argv) {
                 fprintf(output_file, "# Stage 0\n");
                 fprintf(output_file, "# Parameters N=%d K=%d C=%d\n", g.n, g.k, g.so);
                 fprintf(output_file, "# Values ASPL=%g Diameter=%d\n", scan.best_aspl, scan.best_diam);
-                if (FSEEK(bfs_file, (scan.bfs_log_count - scan.graph_count_best) * GS_SIZE, SEEK_SET))
+                if (FSEEK(bfs_file, static_cast<long>((scan.bfs_log_count - scan.graph_count_best) * GS_SIZE), SEEK_SET))
                     goto error;
                 {
                     void *buf = g.s + g.so;
@@ -519,7 +515,7 @@ int main(int argc, char **argv) {
                     size_t ele_read = 0;
                     while ((ele_read = fread(buf, sizeof(*g.s), len, bfs_file))) {
                         if (ele_read == len) {
-                            for (int i = 0; i < g.k - 1; i++) {
+                            for (int i = 0; i < g.k - 1; ++i) {
                                 fprintf(output_file, "%d ", g.s[i]);
                             }
                             fprintf(output_file, "%d\n", g.s[g.k - 1]);
@@ -542,7 +538,7 @@ int main(int argc, char **argv) {
                 goto error;
         }
         case PCGP_STAGE_KL: {
-            if (FSEEK(bfs_file, (scan.bfs_log_count - scan.graph_count_max + scan.graph_count) * GS_SIZE, SEEK_SET))
+            if (FSEEK(bfs_file, static_cast<long>((scan.bfs_log_count - scan.graph_count_max + scan.graph_count) * GS_SIZE), SEEK_SET))
                 goto error;
             {
                 void *buf = g.s + g.so;
@@ -557,19 +553,19 @@ int main(int argc, char **argv) {
                                 scan.best_bisect_cost = bisect_cost;
                                 scan.graph_count_best = 1;
                             } else {
-                                scan.graph_count_best++;
+                                ++scan.graph_count_best;
                             }
-                            scan.kl_log_count++;
+                            ++scan.kl_log_count;
                             {
-                                void *buf = g.s + g.so;
-                                size_t len = g.k - g.so;
+                                buf = g.s + g.so;
+                                len = g.k - g.so;
                                 if (fwrite(buf, sizeof(*g.s), len, kl_file) < len)
                                     goto error;
                             }
                         }
-                        scan.graph_count++;
+                        ++scan.graph_count;
                         clock_t clock_now = clock();
-                        double elapsed = (clock_now - clock_prev) / CLOCKS_PER_SEC;
+                        double elapsed = static_cast<double>(clock_now - clock_prev) / CLOCKS_PER_SEC;
                         if ((scan.graph_count == scan.graph_count_max) || elapsed >= STATE_UPDATE_TIME) {
                             {/* print logs */
                                 clock_prev = clock_now;
@@ -578,7 +574,7 @@ int main(int argc, char **argv) {
                                 double elapsed_total = (double)(clock_now - clock_start) / CLOCKS_PER_SEC;
                                 double gps           = (double)graph_count_rel / elapsed;
                                 double eta           = (double)(scan.graph_count_max - scan.graph_count) / gps;
-                                double scan_prc      = (double)scan.graph_count / scan.graph_count_max * 100.0;
+                                double scan_prc      = (double)scan.graph_count / (double)scan.graph_count_max * 100.0;
                                 int rc = 0;
                                 rc = fprintf(stderr, "[Stage 1] %.2f%% (%lld/%lld) ETA=%.fs Elapsed=%gs GPS=%g BISECT_COST=%d\n",
                                              scan_prc, scan.graph_count, scan.graph_count_max,
@@ -600,7 +596,7 @@ int main(int argc, char **argv) {
                 }
             }
             {/* write KL pass results */
-                FILE *output_file = NULL;
+                FILE *output_file = nullptr;
                 {
                     char file_name[0x100] = { 0 };
                     int len = snprintf(file_name, sizeof(file_name), "%d-%d-%d.output-stage1.txt", g.n, g.k, g.so);
@@ -615,7 +611,7 @@ int main(int argc, char **argv) {
                 fprintf(output_file, "# Stage 1\n");
                 fprintf(output_file, "# Parameters N=%d K=%d C=%d\n", g.n, g.k, g.so);
                 fprintf(output_file, "# Values ASPL=%g Diameter=%d BisectCost=%d\n", scan.best_aspl, scan.best_diam, scan.best_bisect_cost);
-                if (FSEEK(kl_file, (scan.kl_log_count - scan.graph_count_best) * GS_SIZE, SEEK_SET))
+                if (FSEEK(kl_file, static_cast<long>((scan.kl_log_count - scan.graph_count_best) * GS_SIZE), SEEK_SET))
                     goto error;
                 {
                     void *buf = g.s + g.so;
@@ -638,7 +634,7 @@ int main(int argc, char **argv) {
         fprintf(stderr, "Done\n");
     } break;
     case PCGP_MODE_IMMEDIATE: {
-        Arena arena = { 0 };
+        Arena arena;
         size_t arena_size = 1 << 26;
         {
             void *arena_mem = malloc(arena_size);
@@ -658,7 +654,7 @@ int main(int argc, char **argv) {
                 while (sscanf(line, "%d%n", &n, &len) == 1) {
                     graph_buf[i] = n;
                     line += len;
-                    i++;
+                    ++i;
                 }
                 g.n = graph_buf[0];
                 g.k = i - 1;
@@ -682,5 +678,5 @@ int main(int argc, char **argv) {
     }
     return EXIT_SUCCESS;
 error:
-    die(NULL);
+    die(nullptr);
 }

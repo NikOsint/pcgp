@@ -51,5 +51,8 @@ Module.symvers
 Mkfile.old
 dkms.conf
 
+# IDE project files
+.idea/
+
 # Directories with executable work artifacts
 pcgp-*/
