@@ -13,7 +13,7 @@ run: all
 
 .PHONY: all
 all: pcgpmem.h pcgpmem.cpp pcgp.cpp
-	g++ -Wall -std=c++11 pcgpmem.cpp pcgp.cpp -o pcgp.exe #-fopenmp
+	g++ -Wall -std=c++11 pcgpmem.cpp pcgp.cpp -o pcgp.exe -fopenmp
 
 .PHONY: clean
 clean:

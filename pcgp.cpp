@@ -18,11 +18,12 @@
 #include <cfloat>
 #include <cctype>
 
-//#include <omp.h>
+#include <omp.h>
 
 #include "pcgpmem.h"
 
 #define LINE_MAX 4096
+#define MAX_THREADS 12
 
 void die(const char *msg) {
     if (errno) {
@@ -33,7 +34,7 @@ void die(const char *msg) {
     exit(EXIT_FAILURE);
 }
 
-bool str2int(int *out, char *str, int base) {
+bool str2int(int *out, const char *str, int base) {
     char *end = nullptr;
     if (str[0] == '\0' || isspace(str[0]))
         return false;
@@ -66,12 +67,12 @@ typedef struct {
     int v;
 } VertPair;
 
-void adjVert(VertPair *__restrict p, Graph *__restrict g, int u, int i) {
+void adjVert(VertPair *__restrict p, const Graph *__restrict g, int u, int i) {
     p->u = (u + g->s[i]) % g->n;
     p->v = (u - g->s[i] + g->n) % g->n;
 }
 
-void circulantBFS(Arena *__restrict arena, GraphProp *__restrict prop, Graph *__restrict g) {
+void circulantBFS(Arena *__restrict arena, GraphProp *__restrict prop, const Graph *__restrict g) {
     int *__restrict dist = static_cast<int*>(arenaAlloc(arena, g->n * sizeof(*dist)));
     int *__restrict queue = static_cast<int*>(arenaAlloc(arena, g->n * sizeof(*queue)));
     dist[0] = 0;
@@ -86,7 +87,7 @@ void circulantBFS(Arena *__restrict arena, GraphProp *__restrict prop, Graph *__
         int u = queue[++qr];
         int d = dist[u] + 1;
         for (int i = 0; i < g->k; ++i) {
-            VertPair uv = { 0 };
+            VertPair uv;
             adjVert(&uv, g, u, i);
             if (dist[uv.u] == INT_MAX) {
                 queue[++qw] = uv.u;
@@ -115,9 +116,9 @@ typedef struct {
     int g;
 } KLPair;
 
-int KernighanLinC(Graph *graph, const int *part, unsigned a, unsigned b) {
+int KernighanLinC(const Graph *graph, const int *part, unsigned a, unsigned b) {
     for (int i = 0; i < graph->k; ++i) {
-        VertPair uv = { 0 };
+        VertPair uv;
         adjVert(&uv, graph, static_cast<int>(a), i);
         if (uv.v == static_cast<int>(b) || uv.u == static_cast<int>(b)) {
             return part[a] != part[b] ? 1 : -1;
@@ -126,7 +127,7 @@ int KernighanLinC(Graph *graph, const int *part, unsigned a, unsigned b) {
     return 0;
 }
 
-int KernighanLinPartitionCost(Graph *graph, const int *part) {
+int KernighanLinPartitionCost(const Graph *graph, const int *part) {
     int cost = 0;
     for (int u = 0; u < graph->n; ++u) {
         for (int i = 0; i < graph->k; ++i) {
@@ -139,7 +140,7 @@ int KernighanLinPartitionCost(Graph *graph, const int *part) {
     return cost;
 }
 
-int circulantKernighanLin(Arena *__restrict arena, Graph *__restrict graph) {
+int circulantKernighanLin(Arena *__restrict arena, const Graph *__restrict graph) {
     int *__restrict V = static_cast<int*>(arenaAlloc(arena, graph->n * sizeof(*V)));
     int *__restrict P = static_cast<int*>(arenaAlloc(arena, graph->n * sizeof(*P)));
     int *__restrict D = static_cast<int*>(arenaAlloc(arena, graph->n * sizeof(*D)));
@@ -153,14 +154,15 @@ int circulantKernighanLin(Arena *__restrict arena, Graph *__restrict graph) {
     for (int i = graph->n / 2; i < graph->n; ++i) {
         P[i] = 1;
     }
-    //#pragma omp parallel default(none) private (GAB_size, G_sum_max) shared(graph, V, P, D, G_sum, GAB, passes)
     do {
         GAB_size = 0;
-        for (int u = 0; u < graph->n; ++u) {
+        for (int u = 0; u < graph->n; ++u) { //todo
             V[u] = 0;
             D[u] = 0;
+
+            #pragma omp parallel for default(none) shared(graph, u, P) reduction(+:D[u])
             for (int i = 0; i < graph->k; ++i) {
-                VertPair uv = { 0 };
+                VertPair uv;
                 adjVert(&uv, graph, u, i);
                 D[u] += (P[u] != P[uv.u] ? 1 : -1);
                 if (uv.u != uv.v) {
@@ -168,41 +170,45 @@ int circulantKernighanLin(Arena *__restrict arena, Graph *__restrict graph) {
                 }
             }
         }
-        // private(i, a, b, g, a_max, b_max, g_max, gab, u, c_ab, c_yb, c_xa, c_xb)
-        //#pragma omp parallel default(none) shared(graph, V, P, D, GAB, GAB_size)
         {
-            //#pragma omp for
             for (int i = 0; i < graph->n / 2; ++i) {
-                int g_max = INT_MIN;
-                int a_max = 0, b_max = 0;
-                for (int a = 0; a < graph->n; ++a) {
+                int g_max[3];
+                g_max[0] = INT_MIN;
+                g_max[1] = g_max[2] = 0;
+
+                #pragma omp parallel for default(none) shared(graph, V, P, D, g_max)
+                for (int a = 0; a < graph->n; ++a) { //todo
                     if (!V[a] && (P[a] == 0)) {
                         for (int b = 0; b < graph->n; ++b) {
                             if (!V[b] && (P[b] == 1)) {
                                 int g = D[a] + D[b] - 2 * KernighanLinC(graph, P, a, b);
-                                if (g > g_max) {
-                                    g_max = g;
-                                    a_max = a;
-                                    b_max = b;
+                                if (g > g_max[0]) {
+                                    g_max[0] = g;
+                                    g_max[1] = a;
+                                    g_max[2] = b;
                                 }
                             }
                         }
                     }
                 }
-                V[a_max] = V[b_max] = 1;
+
+                #pragma omp master
+                V[g_max[1]] = V[g_max[2]] = 1;
                 KLPair *gab = &GAB[++GAB_size];
-                gab->a = a_max;
-                gab->b = b_max;
-                gab->g = g_max;
-                for (int u = 0; u < graph->n; ++u) {
+                gab->g = g_max[0];
+                gab->a = g_max[1];
+                gab->b = g_max[2];
+
+                #pragma omp parallel for default(none) shared(graph, V, P, D, g_max)
+                for (int u = 0; u < graph->n; ++u) { //todo
                     if (V[u]) continue;
                     else if (P[u]) {
-                        int c_yb = KernighanLinC(graph, P, u, b_max);
-                        int c_ab = KernighanLinC(graph, P, u, a_max);
+                        int c_yb = KernighanLinC(graph, P, u, g_max[2]);
+                        int c_ab = KernighanLinC(graph, P, u, g_max[1]);
                         D[u] += 2 * c_yb - 2 * c_ab;
                     } else {
-                        int c_xa = KernighanLinC(graph, P, u, a_max);
-                        int c_xb = KernighanLinC(graph, P, u, b_max);
+                        int c_xa = KernighanLinC(graph, P, u, g_max[1]);
+                        int c_xb = KernighanLinC(graph, P, u, g_max[2]);
                         D[u] += 2 * c_xa - 2 * c_xb;
                     }
                 }
@@ -267,12 +273,11 @@ enum PcgpMode {
     PCGP_MODE_IMMEDIATE,
 };
 
-int graphCheck(Graph *g) {
+bool graphCheck(const Graph *g) {
     if (g->n < 0 || g->k <= 0 || g->k > g->n / 2 || g->so < 0 || g->so > g->k) {
-        return 1;
-    } else {
-        return 0;
+        return true;
     }
+    return false;
 }
 
 int main(int argc, char **argv) {
@@ -286,6 +291,7 @@ int main(int argc, char **argv) {
     }
     --argc;
     ++argv;
+    omp_set_num_threads(MAX_THREADS);
     switch (mode) {
     case PCGP_MODE_SCAN: {
         Graph g;
@@ -308,19 +314,19 @@ int main(int argc, char **argv) {
         FILE *kl_file = nullptr;
         {/* restore scan state from file or initialize */
             bool restored = false;
-            char bfs_file_name[0x100] = { 0 };
+            char bfs_file_name[0x100];
             {
                 int len = snprintf(bfs_file_name, sizeof(bfs_file_name), "%d-%d-%d.bfs.bin", g.n, g.k, g.so);
                 if (len < 0 || (unsigned)len >= sizeof(bfs_file_name))
                     goto error;
             }
-            char kl_file_name[0x100] = { 0 };
+            char kl_file_name[0x100];
             {
                 int len = snprintf(kl_file_name, sizeof(kl_file_name), "%d-%d-%d.kl.bin", g.n, g.k, g.so);
                 if (len < 0 || (unsigned)len >= sizeof(kl_file_name))
                     goto error;
             }
-            char state_file_name[0x100] = { 0 };
+            char state_file_name[0x100];
             {
                 int len = snprintf(state_file_name, sizeof(state_file_name), "%d-%d-%d.state.bin", g.n, g.k, g.so);
                 if (len < 0 || (unsigned)len >= sizeof(state_file_name))
@@ -391,7 +397,7 @@ int main(int argc, char **argv) {
         }
         FILE *log_file = nullptr;
         {
-            char file_name[0x100] = { 0 };
+            char file_name[0x100];
             int len = snprintf(file_name, sizeof(file_name), "%d-%d-%d.log.csv", g.n, g.k, g.so);
             if (len < 0 || (unsigned)len >= sizeof(file_name))
                 goto error;
@@ -401,7 +407,7 @@ int main(int argc, char **argv) {
             if (fputs("graph_count,elapsed,eta,best_diam,best_aspl\n", log_file) == EOF)
                 goto error;
         }
-        Arena arena = { nullptr, nullptr, nullptr };
+        Arena arena;
         {
             size_t arena_size = 64 * g.n * sizeof(*g.s);
             void *arena_mem = malloc(arena_size);
@@ -417,7 +423,7 @@ int main(int argc, char **argv) {
             bool running = true;
             while (running) {
                 {/* compute and write values for S */
-                    GraphProp prop = { 0 };
+                    GraphProp prop;
                     circulantBFS(&arena, &prop, &g);
                     if (prop.diam <= scan.best_diam && prop.aspl <= scan.best_aspl) {
                         if (prop.aspl < scan.best_aspl) {
@@ -494,7 +500,7 @@ int main(int argc, char **argv) {
             {/* write BFS pass results */
                 FILE *output_file = nullptr;
                 {
-                    char file_name[0x100] = { 0 };
+                    char file_name[0x100];
                     int len = snprintf(file_name, sizeof(file_name), "%d-%d-%d.output-stage0.txt", g.n, g.k, g.so);
                     if (len < 0 || (unsigned)len >= sizeof(file_name))
                         goto error;
@@ -598,7 +604,7 @@ int main(int argc, char **argv) {
             {/* write KL pass results */
                 FILE *output_file = nullptr;
                 {
-                    char file_name[0x100] = { 0 };
+                    char file_name[0x100];
                     int len = snprintf(file_name, sizeof(file_name), "%d-%d-%d.output-stage1.txt", g.n, g.k, g.so);
                     if (len < 0 || (unsigned)len >= sizeof(file_name))
                         goto error;
@@ -642,12 +648,12 @@ int main(int argc, char **argv) {
                 goto error;
             arenaInit(&arena, arena_mem, arena_size);
         }
-        int graph_buf[BUFSIZ] = { 0 };
-        char line_buf[LINE_MAX] = { 0 };
+        int graph_buf[BUFSIZ];
+        char line_buf[LINE_MAX];
         while (fgets(line_buf, LINE_MAX, stdin)) {
             if (ferror(stdin))
                 goto error;
-            Graph g = { 0 };
+            Graph g;
             {
                 int n, len, i = 0;
                 char *line = line_buf;
@@ -665,7 +671,7 @@ int main(int argc, char **argv) {
                 continue;
             }
             {
-                GraphProp prop = { 0 };
+                GraphProp prop;
                 circulantBFS(&arena, &prop, &g);
                 int bisect_cost = circulantKernighanLin(&arena, &g);
                 fprintf(stdout, "%d %g %d\n", prop.diam, prop.aspl, bisect_cost);
